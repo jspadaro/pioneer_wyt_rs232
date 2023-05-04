@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import binascii
+from enum import Enum
 import struct
 
 # Convert desired temperature to pioneer serial format
@@ -13,7 +14,7 @@ def toF(celsius):
 def toNearestQuarter(num):
     return int(num*4)/4
 
-def toPioneerHex(celsius):
+def tempToPioneerHex(celsius):
     celsius = toNearestQuarter(celsius)
     
     # Pioneer first nibble is X where, 31-X = celsius temp
@@ -24,6 +25,7 @@ def toPioneerHex(celsius):
     final_nibble = final_nibble_options[(celsius % 1)]
     
     # And 3 0's in the middle, not sure what they are for
+    return [first_nibble, final_nibble]
     return f'{first_nibble:x}000{final_nibble:x}'
     
 
@@ -69,162 +71,152 @@ def get_unknown_message(num):
         binascii.unhexlify(b'bb00010a03050008be'),    # This one is sent much less often
     ]
 
+##### These enums are for setting various modes in generate_message()
+
+class SleepMode(Enum):
+    OFF = 0x0
+    STANDARD = 0x1
+    THE_AGED = 0x2 # This name is from Pioneer/Tuya, not me
+    CHILD = 0x3
+
+class WindSpeed(Enum):
+    # Actually called literally:
+    # Low speed, Mid-Low, Medium speed, Mid-High, High, strong [sic]
+    # Seemed kinda absurd, just set 1-6 + mute (low speed quiet) and auto
+    AUTO = 0
+    ONE = 1
+    TWO = 2
+    THREE = 3
+    FOUR = 4
+    FIVE = 5
+    SIX = 6
+    MUTE = 7
+
+# Heat/Cool/etc
+class Mode(Enum):
+    HEAT = 0x1
+    DEHUMIDIFY = 0x2
+    COOL = 0x3
+    FAN = 0x7
+    AUTO = 0x8
+
+class FanUpDown(Enum):
+    AUTO = 0x0 # Not officially called auto
+    UP_DOWN_FLOW = 0x18
+    UP_FLOW = 0x10
+    DOWN_FLOW = 0x08
+    TOP_FIX = 0x01
+    UPPER_FIX = 0x02
+    MIDDLE_FIX = 0x03
+    ABOVE_DOWN_FIX = 0x04
+    BOTTOM_FIX = 0x05
+
+class FanLeftRight(Enum):
+    AUTO = 0x0
+    LEFT_RIGHT_FLOW = 0x08
+    LEFT_FLOW = 0x10
+    MIDDLE_FLOW = 0x18
+    RIGHT_FLOW = 0x20
+    LEFT_FIX = 0x01
+    LEFT_MIDDLE_FIX = 0x02 # This is called "a bit left" for some reason in app
+    MIDDLE_FIX = 0x3
+    RIGHT_MIDDLE_FIX = 0x4 # Called Center Right in app
+    RIGHT_FIX = 0x5
+
+##### End enums
 
 # Outputs raw bytes to send
-def generate_message(is_on=True, is_display_on=True, is_buzzer_on=True, is_eco=False, is_8_deg_heater=False, is_health_on=False):
+def generate_message(mode, temp_celsius, wind_speed=WindSpeed.AUTO, up_down_mode=FanUpDown.AUTO, left_right_mode=FanLeftRight.AUTO, sleep_mode=SleepMode.OFF, is_on=True, is_display_on=True, is_buzzer_on=True, is_eco=False, is_8_deg_heater=False, is_health_on=False):
+    ##### Sanity checking, should likely add more
+    if temp_celsius > 31 or temp_celsius < 16:
+        print(f'Temperature must be between 16 and 31 degrees celsius')
+        return None
+    ##### End sanity checking
+    
     # Assume we're generating commands from wifi adapter to hvac unit
     message = bytearray(b'\xbb\x00\x01')
     
     # Also assume we're sending a temperature change command
     message += b'\x03'
     
-    # This is a minimal message with all bits below set to 0
-    command = bytearray(binascii.unhexlify(b'1d000064015c00048000000000000000000000000000000000000000038399'))
+    # This is a minimal message with all bits below set to 0.  Not sure what the other bits set represent.
+    command = bytearray(binascii.unhexlify(b'000000005c00048000000000000000000000000000000000000000008099'))
     
     ###### Bitwise operations to set various settings
     
     ###### On / Off
-    command[3] = command[3] & ~0x04
+    if is_on:
+        command[3] = command[3] | 0x04
     
     ###### Display On/Off
-    command[3] = command[3] & ~0x40
+    if is_display_on:
+        command[3] = command[3] | 0x40
 
     ###### Buzzer On/Off
-    command[3] = command[3] & ~0x20
+    if is_buzzer_on:
+        command[3] = command[3] | 0x20
 
     ###### Eco mode
-    command[3] = command[3] & ~0x80
+    if is_eco:
+        command[3] = command[3] | 0x80
     
     ##### 8 Degree Heater
-    command[6] = command[6] & ~0x80
+    if is_8_deg_heater:
+        command[6] = command[6] | 0x80
 
     ##### Health On
-    command[4] = command[4] & ~0x10
+    if is_health_on:
+        command[4] = command[4] | 0x10
         
     ##### Sleep Mode
-    command[15] = command[15] & ~0x03
-    #sleep_mode = 'Off'
-    #sleep_bits = (contents[15] & 0x3)
-    #if sleep_bits == 0x1:
-    #    sleep_mode = 'Standard'
-    #elif sleep_bits == 0x2:
-    #    sleep_mode = 'The Aged'
-    #elif sleep_bits == 0x3:
-    #    sleep_mode = 'Child'
-    #print(f'Sleep mode: {sleep_mode}')
+    command[15] = command[15] | sleep_mode.value
         
     ###### Wind Speed
-    command[4] = command[4] & ~0xc0
-    command[6] = command[6] & ~0xc0
-    ## Wind speed has a few bits set
-    ## Mute   - 0x82 - "low" (0x02) + an upper bit set
-    ## Strong - 0x45 - "high" (0x05) + an upper bit set
-    ## No other upper bits - so 0xc0 should catch
-    #wind_ub = contents[4] & 0xc0
-    ## Lower bits are always set using a max of 0x7 (3 bits)
-    #wind_lb = contents[6] & 0x7
-    #wind = wind_ub | wind_lb
-    #
-    #wind_speed = 'Unknown'
-    ## Just make it a setting 1-6 (1 = low, 6 = strong)
-    #wind_speeds = {0x02: 1, 0x06: 2, 0x03: 3, 0x07: 4, 0x05: 5, 0x45: 6}
-    #if wind in wind_speeds:
-    #    wind_speed = wind_speeds[wind]
-    #else:
-    #    if wind == 0x82:
-    #        wind_speed = 'Mute'
-    #    elif wind == 0x0:
-    #        wind_speed = 'Auto'
-    #print(f'Wind speed: {wind_speed}')
-    #
+    if wind_speed == WindSpeed.AUTO:
+        # Wind speed auto zeroes both of these
+        # Doing that again is unnecessary
+        pass
+    elif wind_speed == WindSpeed.MUTE:
+        # Mute sets sets this bit plus
+        command[4] = command[4] | 0x80
+        # Also sets other byte to "low"
+        command[6] = command[6] | 0x02
+    elif wind_speed == WindSpeed.SIX:
+        # "Strong" sets this bit plus
+        command[4] = command[4] | 0x40
+        # Also sets other byte to "high"
+        command[6] = command[6] | 0x05
+    else:
+        # All other wind speeds clear these two bits from this byte
+        command[4] = command[4] & ~0xc0
+        
+        # Seems like protocol intended low/med/high (0x2,0x3,0x5) then added two more speeds
+        # Order is confusing
+        speeds = {1: 0x2, 2: 0x06, 3: 0x03, 4: 0x07, 5: 0x05}
+        
+        command[6] = command[6] | speeds[wind_speed.value]
+    
     ###### Mode
-    command[4] = command[4] & ~0x0f
-    #mode = 'Unknown'
-    #mode_byte = contents[4]&0xf
-    #
-    #if mode_byte == 0x1:
-    #    mode = 'Heat'
-    #elif mode_byte == 0x2:
-    #    mode = 'Dehumidify'
-    #elif mode_byte == 0x3:
-    #    mode = 'Cool'
-    #elif mode_byte == 0x7:
-    #    mode = 'Fan'
-    #elif mode_byte == 0x8:
-    #    mode = 'Auto'
-    #print(f'AC Mode: {mode}')
-    #
+    command[4] = command[4] | mode.value
+    
     ###### Set temperature
-    ## Get temperature, two nibbles in different parts of message
-    #temp_celsius = fromPioneerHex(nibbleToHexInt(message[19]), nibbleToHexInt(message[24]))
-    #temp_f = toF(temp_celsius)
-    #print(f'Set temperature: {temp_f:.2f}F')
-    #
+    temp_bytes = tempToPioneerHex(temp_celsius)
+    command[9] = command[9] | temp_bytes[0]
+    command[11] = command[11] | temp_bytes[1]
+    
     ####### Up/Down Fan
-    ## Setting bits on this byte sets "flow" on/off
-    command[6] = command[6] & ~0x38
-    command[28] = command[28] & ~0x1f
-    #is_flow = (contents[6] & 0x38) == 0x38
-    #up_down_fan = 'Unknown'
-    #
-    ## Could probably also just look at these 5 bits to tell
-    #if is_flow:
-    #    if contents[28] & 0x18:
-    #        up_down_fan = 'Up/Down Flow'
-    #    elif contents[28] & 0x10:
-    #        up_down_fan = 'Up Flow'
-    #    elif contents[28] & 0x8:
-    #        up_down_fan = 'Down Flow'
-    #else:
-    #    # Not sure if other bits are used for anything, playing it safe
-    #    fix_bits = contents[28] & 0x7
-    #    
-    #    if fix_bits == 0x1:
-    #        up_down_fan = 'Top Fix'
-    #    elif fix_bits == 0x2:
-    #        up_down_fan = 'Upper Fix'
-    #    elif fix_bits == 0x3:
-    #        up_down_fan = 'Middle Fix'
-    #    elif fix_bits == 0x4:
-    #        up_down_fan = 'Above Down Fix'
-    #    elif fix_bits == 0x5:
-    #        up_down_fan = 'Bottom Fix'
-    #if (contents[28] & 0x1f) == 0:
-    #    up_down_fan = 'Auto'
-    #print(f'Up/Down Fan: {up_down_fan}')
-    #
+    if up_down_mode in [FanUpDown.UP_DOWN_FLOW, FanUpDown.UP_FLOW, FanUpDown.DOWN_FLOW]:
+        # Flow modes set this bit:
+        command[6] = command[6] | 0x38
+    # Regardless of mode, assign enum value to this byte
+    command[28] = command[28] | up_down_mode.value
+    
     ####### Left/Right Fan
-    ## Setting bits on this byte sets "flow" on/off
-    command[7] = command[7] & ~0x08
-    command[29] = command[29] & ~0x3f
-    #is_flow = (contents[7] & 0x8) == 0x8
-    #left_right_fan = 'Unknown'
-    #
-    ## Left right appears to always use lower 6 bits from this byte
-    #lr_byte = contents[29] & 0x3f
-    #if is_flow:
-    #    if lr_byte == 0x08:
-    #        left_right_fan = 'Left-Right Flow'
-    #    elif lr_byte == 0x10:
-    #        left_right_fan = 'Left Flow'
-    #    elif lr_byte == 0x18:
-    #        left_right_fan = 'Middle Flow'
-    #    elif lr_byte == 0x20:
-    #        left_right_fan = 'Right Flow'
-    #else:
-    #    if lr_byte == 0x1:
-    #        left_right_fan = 'Left Fix'
-    #    elif lr_byte == 0x2:
-    #        left_right_fan = 'A Bit Left Fix'
-    #    elif lr_byte == 0x3:
-    #        left_right_fan = 'Middle Fix'
-    #    elif lr_byte == 0x4:
-    #        left_right_fan = 'Center Right Fix'
-    #    elif lr_byte == 0x5:
-    #        left_right_fan = 'Right Fix'
-    #if lr_byte == 0:
-    #    left_right_fan = 'Auto'
-    #print(f'Left/Right Fan: {left_right_fan}')
+    if left_right_mode in [FanLeftRight.LEFT_RIGHT_FLOW, FanLeftRight.LEFT_FLOW, FanLeftRight.MIDDLE_FLOW, FanLeftRight.RIGHT_FLOW]:
+        # Flow modes set this bit:
+        command[7] = command[7] | 0x8
+    # Regardless of mode, assign enum value to this byte
+    command[29] = command[29] | left_right_mode.value
     
     # Put command on message
     message = message + command
@@ -234,6 +226,6 @@ def generate_message(is_on=True, is_display_on=True, is_buzzer_on=True, is_eco=F
     
     return message
 
-print('This script will generate messages with the provided characteristics.')
-message = generate_message()
+## Generate a message with the provided command syntax
+message = generate_message(Mode.HEAT, 20)
 print(binascii.hexlify(message))

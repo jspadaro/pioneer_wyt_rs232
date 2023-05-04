@@ -165,7 +165,7 @@ def parse_sent_message(message):
                 wind_speed = 'Auto'
         print(f'Wind speed: {wind_speed}')
         
-        ##### Heat mode
+        ##### Mode
         mode = 'Unknown'
         mode_byte = contents[4]&0xf
         
@@ -252,6 +252,10 @@ def parse_sent_message(message):
         print(f'Unknown command: {command}')
         return False
 
+print('\nThis script will parse supported hexlified messages.  Example message:')
+print('bb0001031d000064015c0000800000000000000000000000000000000000000003839d\n')
 while True:
     message = input('Enter a message to parse: ').strip().encode('utf-8')
+    print('') # Newline
     parse_sent_message(message)
+    print('') # Newline

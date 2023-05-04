@@ -26,3 +26,10 @@ bb00010a03050008be
 
 At least three of these change frequently, implying they have status information
 from the HVAC unit.
+
+### Other Notes
+
+- This is similar to the documented Midea protocol, but different
+    - Messages begin with bb rather than aa, for example
+- The wifi adapter sends any given command message 3 to 5 times
+- Each message from wifi adapter to HVAC gets a result

@@ -168,7 +168,6 @@ def parse_sent_message(message):
         ##### Mode
         mode = 'Unknown'
         mode_byte = contents[4]&0xf
-        print(f'mode: {hex(mode_byte)} {hex(contents[4])}')
         
         if mode_byte == 0x1:
             mode = 'Heat'
@@ -186,7 +185,6 @@ def parse_sent_message(message):
         # Get temperature, two nibbles in different parts of message
         temp_celsius = fromPioneerHex(nibbleToHexInt(message[19]), nibbleToHexInt(message[24]))
         temp_f = toF(temp_celsius)
-        print(f'Set temperature: {temp_f:.2f}F')
         
         ###### Up/Down Fan
         # Setting bits on this byte sets "flow" on/off

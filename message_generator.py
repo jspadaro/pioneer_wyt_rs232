@@ -202,8 +202,8 @@ def generate_message(mode, temp_celsius, wind_speed=WindSpeed.AUTO, up_down_mode
     
     ###### Set temperature
     temp_bytes = tempToPioneerHex(temp_celsius)
-    command[9] = command[9] | temp_bytes[0]
-    command[11] = command[11] | temp_bytes[1]
+    command[5] = command[5] | temp_bytes[0]
+    command[8] = command[8] | (temp_bytes[1] << 4)
     
     ####### Up/Down Fan
     if up_down_mode in [FanUpDown.UP_DOWN_FLOW, FanUpDown.UP_FLOW, FanUpDown.DOWN_FLOW]:
@@ -228,5 +228,5 @@ def generate_message(mode, temp_celsius, wind_speed=WindSpeed.AUTO, up_down_mode
     return message
 
 ## Generate a message with the provided command syntax
-message = generate_message(Mode.HEAT, 20)
+message = generate_message(Mode.HEAT, 20.5)
 print(binascii.hexlify(message).decode())

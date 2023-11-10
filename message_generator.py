@@ -126,7 +126,7 @@ class FanLeftRight(Enum):
 ##### End enums
 
 # Outputs raw bytes to send
-def generate_message(mode, temp_celsius, wind_speed=WindSpeed.AUTO, up_down_mode=FanUpDown.AUTO, left_right_mode=FanLeftRight.AUTO, sleep_mode=SleepMode.OFF, is_on=True, is_display_on=True, is_buzzer_on=True, is_eco=False, is_8_deg_heater=False, is_health_on=False):
+def generate_message(mode, temp_celsius, wind_speed=WindSpeed.AUTO, up_down_mode=FanUpDown.AUTO, left_right_mode=FanLeftRight.AUTO, sleep_mode=SleepMode.OFF, is_on=True, is_display_on=True, is_buzzer_on=False, is_eco=False, is_8_deg_heater=False, is_health_on=False):
     ##### Sanity checking, should likely add more
     if temp_celsius > 31 or temp_celsius < 16:
         print(f'Temperature must be between 16 and 31 degrees celsius')
@@ -140,7 +140,8 @@ def generate_message(mode, temp_celsius, wind_speed=WindSpeed.AUTO, up_down_mode
     message += b'\x03'
     
     # This is a minimal message with all bits below set to 0.  Not sure what the other bits set represent.
-    command = bytearray(binascii.unhexlify(b'000000005c00048000000000000000000000000000000000000000008099'))
+    #command = bytearray(binascii.unhexlify(b'000000004c00048000000000000000000000000000000000000000008099'))
+    command = bytearray(binascii.unhexlify(b'000000000c00008000000000000000000000000000000000000000008099'))
     
     ###### Bitwise operations to set various settings
     
@@ -228,4 +229,4 @@ def generate_message(mode, temp_celsius, wind_speed=WindSpeed.AUTO, up_down_mode
 
 ## Generate a message with the provided command syntax
 message = generate_message(Mode.HEAT, 20)
-print(binascii.hexlify(message))
+print(binascii.hexlify(message).decode())

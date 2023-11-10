@@ -224,6 +224,7 @@ def parse_sent_message(message):
         
         # Left right appears to always use lower 6 bits from this byte
         lr_byte = contents[29] & 0x3f
+        print(f'{hex(lr_byte)}')
         if is_flow:
             if lr_byte == 0x08:
                 left_right_fan = 'Left-Right Flow'

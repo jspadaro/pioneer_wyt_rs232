@@ -168,6 +168,7 @@ def parse_sent_message(message):
         ##### Mode
         mode = 'Unknown'
         mode_byte = contents[4]&0xf
+        print(f'mode: {hex(mode_byte)} {hex(contents[4])}')
         
         if mode_byte == 0x1:
             mode = 'Heat'

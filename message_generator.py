@@ -140,7 +140,7 @@ def generate_message(mode, temp_celsius, wind_speed=WindSpeed.AUTO, up_down_mode
     message += b'\x03'
     
     # This is a minimal message with all bits below set to 0.  Not sure what the other bits set represent.
-    command = bytearray(binascii.unhexlify(b'000000000000008000000000000000000000000000000000000000008080'))
+    command = bytearray(binascii.unhexlify(b'1d0000000050000000000000000000000000000000000000000000000080'))
     
     ###### Bitwise operations to set various settings
     

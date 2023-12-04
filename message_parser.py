@@ -185,6 +185,7 @@ def parse_sent_message(message):
         # Get temperature, two nibbles in different parts of message
         temp_celsius = fromPioneerHex(nibbleToHexInt(message[19]), nibbleToHexInt(message[24]))
         temp_f = toF(temp_celsius)
+        print(f'Temperature: {temp_celsius}C {temp_f}')
         
         ###### Up/Down Fan
         # Setting bits on this byte sets "flow" on/off
@@ -224,7 +225,7 @@ def parse_sent_message(message):
         
         # Left right appears to always use lower 6 bits from this byte
         lr_byte = contents[29] & 0x3f
-        print(f'{hex(lr_byte)}')
+        
         if is_flow:
             if lr_byte == 0x08:
                 left_right_fan = 'Left-Right Flow'

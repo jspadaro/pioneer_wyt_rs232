@@ -41,7 +41,7 @@ from the HVAC unit.
     - C 3 times
     - A **5** times
         - I assume this is some kind of synchronization / end of message thing
-    - <Pause>
+    - Brief Pause (1/2 second?)
 - I'm not sure the exact timing on the pause, I just know that's what the real
   unit sends
 - Once you do the above, you can send a generated temperature control message
